@@ -24,20 +24,21 @@
             border-radius: 12px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
             width: 100%;
-            max-width: 500px;
+            max-width: 400px;
         }
         h2 {
             text-align: center;
             color: #333;
             margin-bottom: 20px;
+            font-size: 20px;
         }
         .balance-box {
             background: #e8f5e9;
             color: #2e7d32;
-            padding: 15px;
+            padding: 12px;
             border-radius: 8px;
             text-align: center;
-            font-size: 22px;
+            font-size: 18px;
             font-weight: bold;
             margin-bottom: 20px;
         }
@@ -49,6 +50,7 @@
             margin-bottom: 5px;
             color: #555;
             font-weight: 600;
+            font-size: 14px;
         }
         input {
             width: 100%;
@@ -78,8 +80,13 @@
         .btn-withdraw { background-color: #c62828; }
         .btn-withdraw:hover { background-color: #b71c1c; }
 
-        /* تنسيق الوصل المخصص للطباعة */
+        /* تنسيق خاص للطباعة على طابعة POS 58mm */
         @media print {
+            body {
+                background: white;
+                margin: 0;
+                padding: 0;
+            }
             body * {
                 visibility: hidden;
             }
@@ -90,20 +97,44 @@
                 position: absolute;
                 left: 0;
                 top: 0;
-                width: 100%;
-                padding: 20px;
+                width: 58mm; /* عرض الطابعة القياسي */
+                padding: 2mm;
+                margin: 0;
                 background: white;
+                font-family: 'Courier New', Courier, monospace; /* خط أحادي المسافة مناسب للحراريات */
+                font-size: 11px;
+                color: black;
+                border: none !important;
+            }
+            .receipt-header h3 {
+                font-size: 13px;
+                margin: 0 0 5px 0;
+            }
+            .receipt-header p {
+                font-size: 10px;
+                margin: 0;
+            }
+            .receipt-row {
+                font-size: 11px;
+                margin-bottom: 4px;
+            }
+            hr {
+                border-top: 1px dashed #000;
             }
         }
+
+        /* شكل الوصل العادي على الشاشة قبل الطباعة */
         #printable-receipt {
             display: none;
             border: 2px dashed #333;
-            padding: 20px;
+            padding: 15px;
             margin-top: 20px;
             border-radius: 8px;
+            background: #fff;
+            width: 100%;
         }
-        .receipt-header { text-align: center; border-bottom: 1px solid #ccc; padding-bottom: 10px; margin-bottom: 10px;}
-        .receipt-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
+        .receipt-header { text-align: center; border-bottom: 1px solid #ccc; padding-bottom: 8px; margin-bottom: 8px;}
+        .receipt-row { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 14px; }
         .print-btn { background-color: #0288d1; margin-top: 15px; width: 100%; display: none; }
         .print-btn:hover { background-color: #01579b; }
     </style>
@@ -114,12 +145,12 @@
     <h2>نظام إدارة الصندوق</h2>
     
     <div class="balance-box">
-        الرصيد الحالي: <span id="balanceDisplay">1000.00</span> د.ع
+        الرصيد الحالي: <span id="balanceDisplay">1,000</span> د.ع
     </div>
 
     <div class="form-group">
-        <label for="amount">المبلغ:</label>
-        <input type="number" id="amount" placeholder="أدخل المبلغ" min="0">
+        <label for="amount">المبلغ (دينار عراقي):</label>
+        <input type="number" id="amount" placeholder="أدخل المبلغ" min="0" step="1">
     </div>
 
     <div class="btn-group">
@@ -127,31 +158,35 @@
         <button class="btn-withdraw" onclick="processTransaction('سحب')">سحب (-)</button>
     </div>
 
-    <!-- قسم الوصل -->
+    <!-- قسم الوصل (متوافق مع 58mm) -->
     <div id="printable-receipt">
         <div class="receipt-header">
             <h3>وصل معاملة مالية</h3>
             <p id="receiptDate"></p>
         </div>
-        <div class="receipt-row"><span>نوع العملية:</span> <span id="rType"></span></div>
+        <div class="receipt-row"><span>النوع:</span> <span id="rType"></span></div>
         <div class="receipt-row"><span>المبلغ:</span> <span id="rAmount"></span></div>
-        <div class="receipt-row"><span>الرصيد السابق:</span> <span id="rOldBalance"></span></div>
-        <div class="receipt-row"><span>الرصيد الجديد:</span> <span id="rNewBalance"></span></div>
+        <div class="receipt-row"><span>السابق:</span> <span id="rOldBalance"></span></div>
+        <div class="receipt-row"><span>الجديد:</span> <span id="rNewBalance"></span></div>
         <hr>
-        <p style="text-align: center; font-size: 12px;">شكراً لتعاملكم معنا</p>
+        <p style="text-align: center; font-size: 10px;">شكراً لتعاملكم معنا</p>
     </div>
 
     <button class="btn btn-print print-btn" id="printBtn" onclick="printReceipt()">طباعة الوصل</button>
 </div>
 
 <script>
-    // تم دمج رابط السكربت الخاص بك هنا
     const scriptURL = "https://script.google.com/macros/s/AKfycbxp6Z5ylXArYXphv6KGdcAjKkoGK34Es2SjwpFrpPer1XMWuIndHGFMsyPsj4gU4nSXog/exec";
 
-    let currentBalance = 1000.00; // رصيد افتراضي أولي
+    let currentBalance = 1000; // رصيد أولي صحيح بدون كسور
+
+    // دالة لتنسيق الأرقام بفواصل الآلاف بدون كسور عشرية
+    function formatIQD(num) {
+        return Math.round(num).toLocaleString('en-US') + " د.ع";
+    }
 
     function processTransaction(type) {
-        let amount = parseFloat(document.getElementById('amount').value);
+        let amount = parseInt(document.getElementById('amount').value);
 
         if (isNaN(amount) || amount <= 0) {
             alert("الرجاء إدخال مبلغ صحيح!");
@@ -171,27 +206,27 @@
         }
 
         // تحديث واجهة الرصيد
-        document.getElementById('balanceDisplay').innerText = currentBalance.toFixed(2);
+        document.getElementById('balanceDisplay').innerText = formatIQD(currentBalance);
 
         // تجهيز بيانات الوصل
         let now = new Date().toLocaleString('ar-IQ');
         document.getElementById('receiptDate').innerText = now;
         document.getElementById('rType').innerText = type;
-        document.getElementById('rAmount').innerText = amount.toFixed(2) + " د.ع";
-        document.getElementById('rOldBalance').innerText = oldBalance.toFixed(2) + " د.ع";
-        document.getElementById('rNewBalance').innerText = currentBalance.toFixed(2) + " د.ع";
+        document.getElementById('rAmount').innerText = formatIQD(amount);
+        document.getElementById('rOldBalance').innerText = formatIQD(oldBalance);
+        document.getElementById('rNewBalance').innerText = formatIQD(currentBalance);
 
         // إظهار الوصل وزر الطباعة
         document.getElementById('printable-receipt').style.display = 'block';
         document.getElementById('printBtn').style.display = 'block';
 
-        // إرسال البيانات إلى Google Sheets
+        // إرسال البيانات إلى Google Sheets (بدون كسور)
         saveToGoogleSheets({
             date: now,
             type: type,
-            amount: amount,
-            oldBalance: oldBalance,
-            newBalance: currentBalance
+            amount: Math.round(amount),
+            oldBalance: Math.round(oldBalance),
+            newBalance: Math.round(currentBalance)
         });
 
         // تفريغ حقل المبلغ
